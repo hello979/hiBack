@@ -3,6 +3,13 @@ const Waitlist = require('../models/Waitlist');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const timeToMinutes = (value) => {
+  if (!TIME_24H_REGEX.test(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
 // In-memory map to throttle calendar event requests per user.
 // Key: userId (string) -> timestamp (ms)
 const calendarFetchTimestamps = new Map();
@@ -153,7 +160,18 @@ exports.getCurrentUser = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ msg: 'Not authorized' });
     const user = req.user;
-    res.json({ user: { id: user._id, username: user.username, email: user.email, access: user.access, calendarConnected: !!(user.googleCalendarRefreshToken || user.googleCalendarAccessToken), calendarSynced: user.calendarSynced, calendarLastSynced: user.calendarLastSynced } });
+    res.json({
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        access: user.access,
+        preferences: user.preferences,
+        calendarConnected: !!(user.googleCalendarRefreshToken || user.googleCalendarAccessToken),
+        calendarSynced: user.calendarSynced,
+        calendarLastSynced: user.calendarLastSynced
+      }
+    });
   } catch (err) {
     console.error('Get current user error:', err);
     res.status(500).json({ msg: 'Server error' });
@@ -434,5 +452,75 @@ exports.getWaitlistStatus = async (req, res) => {
   } catch (err) {
     console.error('Get Waitlist Status Error:', err);
     res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.updateSchedulingPreferences = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ msg: 'Not authorized' });
+
+    const workingHoursInput = req.body.workingHours || {};
+    const workingDaysInput = req.body.workingDays;
+    const bufferMinutesInput = req.body.bufferMinutes;
+    const meetingDurationInput = req.body.meetingDuration;
+
+    const currentWorkingHours = req.user.preferences?.workingHours || {};
+    const proposedStart = typeof workingHoursInput.start === 'string' ? workingHoursInput.start : currentWorkingHours.start;
+    const proposedEnd = typeof workingHoursInput.end === 'string' ? workingHoursInput.end : currentWorkingHours.end;
+
+    if (workingHoursInput.start && !TIME_24H_REGEX.test(workingHoursInput.start)) {
+      return res.status(400).json({ msg: 'Start time must be in HH:MM (24h) format.' });
+    }
+    if (workingHoursInput.end && !TIME_24H_REGEX.test(workingHoursInput.end)) {
+      return res.status(400).json({ msg: 'End time must be in HH:MM (24h) format.' });
+    }
+    if (proposedStart && proposedEnd) {
+      const startMinutes = timeToMinutes(proposedStart);
+      const endMinutes = timeToMinutes(proposedEnd);
+      if (startMinutes === null || endMinutes === null || endMinutes - startMinutes < 15) {
+        return res.status(400).json({ msg: 'Working window must be at least 15 minutes and use HH:MM format.' });
+      }
+    }
+
+    const updates = {};
+    if (workingHoursInput.start) updates['preferences.workingHours.start'] = workingHoursInput.start;
+    if (workingHoursInput.end) updates['preferences.workingHours.end'] = workingHoursInput.end;
+
+    const timezoneInput = workingHoursInput.timezone || req.body.timezone;
+    if (timezoneInput && typeof timezoneInput === 'string') {
+      updates['preferences.workingHours.timezone'] = timezoneInput;
+    }
+
+    if (Array.isArray(workingDaysInput)) {
+      const sanitized = [...new Set(workingDaysInput.map(Number))].filter(d => d >= 0 && d <= 6);
+      if (!sanitized.length) {
+        return res.status(400).json({ msg: 'Select at least one working day.' });
+      }
+      updates['preferences.workingDays'] = sanitized;
+    }
+
+    if (typeof bufferMinutesInput === 'number' && bufferMinutesInput >= 0 && bufferMinutesInput <= 240) {
+      updates['preferences.meetingBufferMinutes'] = Math.round(bufferMinutesInput);
+    }
+
+    if (typeof meetingDurationInput === 'number' && meetingDurationInput >= 15 && meetingDurationInput <= 240) {
+      updates['preferences.publicBooking.meetingDuration'] = Math.round(meetingDurationInput);
+    }
+
+    const hasUpdates = Object.keys(updates).length > 0;
+    const updatedUser = hasUpdates
+      ? await User.findByIdAndUpdate(req.user._id, { $set: updates }, { new: true, runValidators: true })
+      : await User.findById(req.user._id);
+
+    if (!updatedUser) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    req.user = updatedUser; // keep middleware user in sync for downstream handlers
+
+    res.json({ success: true, preferences: updatedUser.preferences });
+  } catch (err) {
+    console.error('Update scheduling preferences error:', err);
+    res.status(500).json({ msg: 'Failed to save scheduling preferences' });
   }
 };

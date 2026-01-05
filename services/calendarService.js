@@ -4,6 +4,7 @@
  */
 
 const { google } = require('googleapis');
+const { DateTime } = require('luxon');
 const integrationHelper = require('../utils/integrationHelper');
 
 /**
@@ -142,7 +143,14 @@ exports.createEvent = async (userId, eventData) => {
       attendees: eventData.attendees || []
     };
   } catch (error) {
-    console.error('[Calendar] Failed to create event:', error.message);
+    const status = error?.code || error?.response?.status;
+    const reason = error?.errors?.[0]?.reason || error?.response?.data?.error?.errors?.[0]?.reason;
+    const isInsufficientPermission = status === 403 || reason === 'insufficientPermissions';
+    const needsReconnect = isInsufficientPermission || /insufficient permission/i.test(error?.message || '');
+    console.error('[Calendar] Failed to create event:', error.message, reason);
+    if (needsReconnect) {
+      throw new Error('Google Calendar needs write access. Reconnect your Google integration under Settings → Integrations and approve calendar access.');
+    }
     throw new Error(`Failed to create calendar event: ${error.message}`);
   }
 };
@@ -210,6 +218,137 @@ exports.getTodayEvents = async (userId) => {
     console.error('[Calendar] Failed to fetch today events:', error.message);
     return [];
   }
+};
+
+/**
+ * Compute availability windows for public scheduling links
+ */
+exports.getAvailability = async (userId, options = {}) => {
+  const calendar = await getCalendarClient(userId);
+
+  const timezone = options.timezone || options.workingHours?.timezone || 'UTC';
+  const slotMinutes = options.slotMinutes || 30;
+  const bufferMinutes = options.bufferMinutes ?? 15;
+  const days = options.days || 7;
+  let workingDays = Array.isArray(options.workingDays) && options.workingDays.length
+    ? options.workingDays.map(Number).filter(d => d >= 0 && d <= 6)
+    : [1, 2, 3, 4, 5]; // 0 = Sunday
+  if (!workingDays.length) {
+    workingDays = [1, 2, 3, 4, 5];
+  }
+
+  const baseStart = options.startDate
+    ? DateTime.fromJSDate(new Date(options.startDate), { zone: timezone })
+    : DateTime.now().setZone(timezone);
+
+  const timeMin = baseStart.startOf('day').toISO();
+  const timeMax = baseStart.plus({ days }).endOf('day').toISO();
+
+  const response = await calendar.freebusy.query({
+    requestBody: {
+      timeMin,
+      timeMax,
+      timeZone: timezone,
+      items: [{ id: 'primary' }]
+    }
+  });
+
+  const busyBlocks = (response.data.calendars?.primary?.busy || []).map(block => ({
+    start: DateTime.fromISO(block.start).setZone(timezone),
+    end: DateTime.fromISO(block.end).setZone(timezone)
+  }));
+
+  const workStart = options.workingHours?.start || '09:00';
+  const workEnd = options.workingHours?.end || '17:00';
+  const [startHour, startMinute] = workStart.split(':').map(Number);
+  const [endHour, endMinute] = workEnd.split(':').map(Number);
+  const now = DateTime.now().setZone(timezone).plus({ minutes: bufferMinutes });
+
+  const daysOutput = [];
+
+  for (let day = 0; day < days; day++) {
+    const windowDate = baseStart.plus({ days: day }).startOf('day');
+    const isoWeekday = windowDate.weekday; // 1 (Mon) -> 7 (Sun)
+    const jsWeekday = isoWeekday % 7; // convert to 0 (Sun) -> 6 (Sat)
+    if (!workingDays.includes(jsWeekday)) {
+      continue;
+    }
+    const dayStart = windowDate.set({ hour: startHour || 0, minute: startMinute || 0, second: 0, millisecond: 0 });
+    const dayEnd = windowDate.set({ hour: endHour || 0, minute: endMinute || 0, second: 0, millisecond: 0 });
+
+    if (dayEnd <= dayStart) continue;
+
+    const slots = [];
+    let cursor = dayStart;
+
+    while (cursor.plus({ minutes: slotMinutes }) <= dayEnd) {
+      const slotEnd = cursor.plus({ minutes: slotMinutes });
+
+      const overlapsBusy = busyBlocks.some(block => {
+        const paddedStart = block.start.minus({ minutes: bufferMinutes });
+        const paddedEnd = block.end.plus({ minutes: bufferMinutes });
+        return slotEnd > paddedStart && cursor < paddedEnd;
+      });
+
+      const isPast = slotEnd <= now;
+
+      if (!overlapsBusy && !isPast) {
+        slots.push({
+          start: cursor.toUTC().toISO(),
+          end: slotEnd.toUTC().toISO(),
+          label: `${cursor.toFormat('hh:mm a')} – ${slotEnd.toFormat('hh:mm a')}`,
+          localStart: cursor.toISO(),
+          localEnd: slotEnd.toISO()
+        });
+      }
+
+      cursor = cursor.plus({ minutes: slotMinutes });
+    }
+
+    const dayBusy = busyBlocks
+      .filter(block => block.start.hasSame(windowDate, 'day'))
+      .map(block => ({
+        start: block.start.toUTC().toISO(),
+        end: block.end.toUTC().toISO(),
+        localStart: block.start.toISO(),
+        localEnd: block.end.toISO()
+      }));
+
+    daysOutput.push({
+      date: windowDate.toISODate(),
+      readable: windowDate.toFormat('EEE, MMM d'),
+      weekday: jsWeekday,
+      slots,
+      busy: dayBusy
+    });
+  }
+
+  return {
+    timezone,
+    slotMinutes,
+    workingHours: { start: workStart, end: workEnd },
+    bufferMinutes,
+    workingDays,
+    days: daysOutput
+  };
+};
+
+/**
+ * Ensure a slot is still available before booking (no overlapping events)
+ */
+exports.isSlotAvailable = async (userId, startTime, endTime) => {
+  const calendar = await getCalendarClient(userId);
+
+  const response = await calendar.freebusy.query({
+    requestBody: {
+      timeMin: new Date(startTime).toISOString(),
+      timeMax: new Date(endTime).toISOString(),
+      items: [{ id: 'primary' }]
+    }
+  });
+
+  const busy = response.data.calendars?.primary?.busy || [];
+  return busy.length === 0;
 };
 
 /**

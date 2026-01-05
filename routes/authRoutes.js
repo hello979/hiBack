@@ -1,6 +1,6 @@
 const express = require('express');
 const passport = require('passport');
-const { registerUser, loginUser, googleCallback, saveThoughts, saveNotificationPermission, getCurrentUser, joinWaitlist, getWaitlistStatus } = require('../controllers/authController');
+const { registerUser, loginUser, googleCallback, saveThoughts, saveNotificationPermission, getCurrentUser, joinWaitlist, getWaitlistStatus, updateSchedulingPreferences } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 // Local Auth
@@ -52,5 +52,6 @@ router.get('/me', protect, getCurrentUser);
 router.get('/calendar/events', protect, require('../controllers/authController').getCalendarEvents);
 // Debug endpoint for calendar token presence
 router.get('/calendar/debug', protect, require('../controllers/authController').getCalendarDebug);
+router.put('/preferences/scheduling', protect, updateSchedulingPreferences);
 
 module.exports = router;

@@ -71,6 +71,18 @@ const UserSchema = new mongoose.Schema({
       end: { type: String, default: "17:00" },
       timezone: { type: String, default: "UTC" }
     },
+    workingDays: {
+      type: [Number],
+      default: [1, 2, 3, 4, 5], // Monday-Friday (0 = Sunday)
+      enum: [0, 1, 2, 3, 4, 5, 6]
+    },
+    publicBooking: {
+      enabled: { type: Boolean, default: true },
+      meetingDuration: { type: Number, default: 30 },
+      headline: { type: String, default: '' },
+      welcomeMessage: { type: String, default: '' },
+      heroImage: { type: String, default: '' }
+    },
     
     // Smart Filtering Lists
     autoTrackList: [{ type: String }],   // e.g., ["important-client.com"]

@@ -30,6 +30,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.4.4",
     "mem0ai": "^2.2.0",
     "mongoose": "^9.0.0",
     "mongoose-encryption": "^2.1.2",

@@ -16,6 +16,7 @@ const integrationRoutes = require('./routes/integrationRoutes');
 const oauthRoutes = require('./routes/oauthRoutes');
 const botRoutes = require('./routes/botRoutes');
 const notesRoute = require('./routes/notes');
+const schedulingRoutes = require('./routes/schedulingRoutes');
 // Fail fast if critical environment variables are missing
 const requiredEnv = ['MONGO_URI', 'JWT_SECRET'];
 const missingEnv = requiredEnv.filter(k => !process.env[k]);
@@ -194,6 +195,7 @@ app.use('/api/team', require('./routes/team'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/actions', actionRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/schedule', schedulingRoutes);
 // Static files (with redirect disabled to prevent CORS issues)
 app.use(express.static(path.join(__dirname, 'public'), { redirect: false }));
 
