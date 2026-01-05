@@ -311,8 +311,9 @@ exports.exportToNotion = async (req, res) => {
 
 exports.getSlackAuthUrl = (req, res) => {
   const state = req.user.id;
-  const scopes = ['chat:write', 'channels:read', 'users:read', 'team:read'].join(',');
-  const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(SLACK_REDIRECT_URI)}&state=${state}`;
+  const scopes = ['chat:write', 'channels:read', 'channels:join', 'groups:read', 'users:read', 'team:read'].join(',');
+  const userScopes = 'search:read';
+  const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(SLACK_REDIRECT_URI)}&state=${state}`;
   res.json({ url: authUrl });
 };
 
