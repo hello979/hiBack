@@ -279,8 +279,7 @@ const providers = {
       'channels:join',
       'groups:read',
       'users:read',
-      'team:read',
-      'search:read'
+      'team:read'
     ],
     
     getAuthParams: () => ({
