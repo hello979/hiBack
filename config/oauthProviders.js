@@ -286,7 +286,7 @@ const providers = {
       client_id: process.env.SLACK_CLIENT_ID,
       redirect_uri: getCallbackUrl(),
       scope: providers.slack.scopes.join(','),
-      user_scope: 'search:read' // Explicitly request user scope for search
+      user_scope: 'search:read'
     }),
     
     exchangeCode: async (code) => {

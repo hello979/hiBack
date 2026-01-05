@@ -313,7 +313,9 @@ exports.getSlackAuthUrl = (req, res) => {
   const state = req.user.id;
   const scopes = ['chat:write', 'channels:read', 'channels:join', 'groups:read', 'users:read', 'team:read'].join(',');
   const userScopes = 'search:read';
-  const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(SLACK_REDIRECT_URI)}&state=${state}`;
+  // Use the unified OAuth callback URL that's registered with Slack
+  const oauthCallbackUrl = process.env.OAUTH_CALLBACK_URL || `${process.env.API_BASE_URL || 'http://localhost:5000'}/oauth/callback`;
+  const authUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(oauthCallbackUrl)}&state=${state}`;
   res.json({ url: authUrl });
 };
 
