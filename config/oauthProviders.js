@@ -290,15 +290,28 @@ const providers = {
     }),
     
     exchangeCode: async (code) => {
+      const clientId = process.env.SLACK_CLIENT_ID;
+      const clientSecret = process.env.SLACK_CLIENT_SECRET;
+      const redirectUri = getCallbackUrl();
+      
+      // Debug logging
+      console.log('[Slack Token Exchange] Client ID:', clientId ? `${clientId.substring(0, 10)}...` : 'NOT SET');
+      console.log('[Slack Token Exchange] Client Secret length:', clientSecret ? clientSecret.length : 0);
+      console.log('[Slack Token Exchange] Client Secret first 4 chars:', clientSecret ? clientSecret.substring(0, 4) : 'N/A');
+      console.log('[Slack Token Exchange] Redirect URI:', redirectUri);
+      console.log('[Slack Token Exchange] Code:', code ? `${code.substring(0, 10)}...` : 'NOT SET');
+      
       const params = new URLSearchParams();
-      params.append('client_id', process.env.SLACK_CLIENT_ID);
-      params.append('client_secret', process.env.SLACK_CLIENT_SECRET);
+      params.append('client_id', clientId);
+      params.append('client_secret', clientSecret);
       params.append('code', code);
-      params.append('redirect_uri', getCallbackUrl());
+      params.append('redirect_uri', redirectUri);
 
       const response = await axios.post(providers.slack.tokenUrl, params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
+      
+      console.log('[Slack Token Exchange] Response:', JSON.stringify(response.data, null, 2));
       
       if (!response.data.ok) {
         throw new Error(response.data.error || 'Slack authorization failed');
