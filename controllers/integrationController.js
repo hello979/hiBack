@@ -1,6 +1,7 @@
 const User = require('../models/users');
 const axios = require('axios');
 const integrationHelper = require('../utils/integrationHelper');
+const oauthState = require('../utils/oauthState');
 const { google } = require('googleapis');
 const Integration = require('../models/Integration'); // Your provided model
 const { Queue } = require('bullmq'); // We need this to trigger the ingestion
@@ -310,7 +311,13 @@ exports.exportToNotion = async (req, res) => {
 };
 
 exports.getSlackAuthUrl = (req, res) => {
-  const state = req.user.id;
+  // Generate a secure state parameter compatible with the unified OAuth controller
+  const state = oauthState.generateState({
+    provider: 'slack',
+    userId: req.user.id,
+    flowType: 'integration'
+  });
+  
   const scopes = ['chat:write', 'channels:read', 'channels:join', 'groups:read', 'users:read', 'team:read'].join(',');
   const userScopes = 'search:read';
   // Use the unified OAuth callback URL that's registered with Slack
