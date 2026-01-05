@@ -290,13 +290,13 @@ const providers = {
     }),
     
     exchangeCode: async (code) => {
-      const response = await axios.post(providers.slack.tokenUrl, null, {
-        params: {
-          client_id: process.env.SLACK_CLIENT_ID,
-          client_secret: process.env.SLACK_CLIENT_SECRET,
-          code,
-          redirect_uri: getCallbackUrl()
-        },
+      const params = new URLSearchParams();
+      params.append('client_id', process.env.SLACK_CLIENT_ID);
+      params.append('client_secret', process.env.SLACK_CLIENT_SECRET);
+      params.append('code', code);
+      params.append('redirect_uri', getCallbackUrl());
+
+      const response = await axios.post(providers.slack.tokenUrl, params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
       
