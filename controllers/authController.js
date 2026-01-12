@@ -26,6 +26,32 @@ const generateToken = (id) => {
   }
 };
 
+// Helper to generate unique default scheduler link name
+const generateDefaultSchedulerLink = async (username) => {
+  try {
+    // Clean username - remove spaces and special chars, convert to lowercase
+    const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    
+    // Try up to 10 times with random numbers
+    let attempts = 0;
+    while (attempts < 10) {
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
+      const linkName = `${cleanUsername}_${randomNum}`;
+      const exists = await User.findOne({ schedulerLinkName: linkName });
+      if (!exists) return linkName;
+      attempts++;
+    }
+    
+    // Fallback to timestamp-based unique name if all attempts fail
+    return `${cleanUsername}_${Date.now()}`;
+  } catch (err) {
+    console.error('Generate scheduler link error:', err);
+    // Ultimate fallback
+    return `user_${Date.now()}`;
+  }
+};
+
+
 // @desc    Register new user (Local)
 exports.registerUser = async (req, res) => {
   console.log('[/api/auth/signup] Incoming body:', req.body);
@@ -38,7 +64,10 @@ exports.registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    user = await User.create({ username, email, password: hashedPassword });
+    // Generate default scheduler link name
+    const schedulerLinkName = await generateDefaultSchedulerLink(username);
+
+    user = await User.create({ username, email, password: hashedPassword, schedulerLinkName });
     // Issue token even if access is false; frontend will show ThankYou page when access=false
     const token = generateToken(user._id);
 
@@ -46,7 +75,7 @@ exports.registerUser = async (req, res) => {
       return res.status(500).json({ msg: 'Token generation failed' });
     }
 
-    res.status(201).json({ token, user: { id: user._id, username, email, access: user.access } });
+    res.status(201).json({ token, user: { id: user._id, username, email, access: user.access, schedulerLinkName: user.schedulerLinkName } });
   } catch (err) {
     console.error('Signup Error:', err);
 
@@ -166,6 +195,7 @@ exports.getCurrentUser = async (req, res) => {
         username: user.username,
         email: user.email,
         access: user.access,
+        schedulerLinkName: user.schedulerLinkName,
         preferences: user.preferences,
         calendarConnected: !!(user.googleCalendarRefreshToken || user.googleCalendarAccessToken),
         calendarSynced: user.calendarSynced,
@@ -522,5 +552,111 @@ exports.updateSchedulingPreferences = async (req, res) => {
   } catch (err) {
     console.error('Update scheduling preferences error:', err);
     res.status(500).json({ msg: 'Failed to save scheduling preferences' });
+  }
+};
+
+// @desc    Check if scheduler link name is available
+exports.checkSchedulerLinkAvailability = async (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, msg: 'Link name is required' });
+    }
+
+    // Validate format
+    const linkNameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!linkNameRegex.test(name) || name.length < 3 || name.length > 30) {
+      return res.status(400).json({ 
+        success: false, 
+        available: false,
+        msg: 'Link name must be 3-30 characters and contain only letters, numbers, hyphens, and underscores' 
+      });
+    }
+
+    // Check if name exists (excluding current user)
+    const exists = await User.findOne({ 
+      schedulerLinkName: name,
+      _id: { $ne: req.user._id }
+    });
+
+    res.json({ 
+      success: true, 
+      available: !exists,
+      msg: exists ? 'This link name is already taken' : 'This link name is available'
+    });
+  } catch (err) {
+    console.error('Check scheduler link availability error:', err);
+    res.status(500).json({ success: false, msg: 'Failed to check availability' });
+  }
+};
+
+// @desc    Update user's scheduler link name
+exports.updateSchedulerLinkName = async (req, res) => {
+  try {
+    const { schedulerLinkName } = req.body;
+    
+    if (!schedulerLinkName) {
+      return res.status(400).json({ success: false, msg: 'Scheduler link name is required' });
+    }
+
+    // Validate format
+    const linkNameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!linkNameRegex.test(schedulerLinkName) || schedulerLinkName.length < 3 || schedulerLinkName.length > 30) {
+      return res.status(400).json({ 
+        success: false, 
+        msg: 'Link name must be 3-30 characters and contain only letters, numbers, hyphens, and underscores' 
+      });
+    }
+
+    // Check if name is already taken (excluding current user)
+    const exists = await User.findOne({ 
+      schedulerLinkName,
+      _id: { $ne: req.user._id }
+    });
+
+    if (exists) {
+      return res.status(409).json({ 
+        success: false, 
+        msg: 'This scheduler link name is already taken. Please choose another one.' 
+      });
+    }
+
+    // Update user's scheduler link name
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { schedulerLinkName } },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, msg: 'User not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      schedulerLinkName: updatedUser.schedulerLinkName,
+      msg: 'Scheduler link name updated successfully'
+    });
+  } catch (err) {
+    console.error('Update scheduler link name error:', err);
+    
+    // Handle MongoDB duplicate key error (race condition)
+    if (err.code === 11000) {
+      return res.status(409).json({ 
+        success: false, 
+        msg: 'This scheduler link name was just taken. Please choose another one.' 
+      });
+    }
+    
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ 
+        success: false, 
+        msg: Object.values(err.errors).map(val => val.message).join(', ') 
+      });
+    }
+
+    res.status(500).json({ success: false, msg: 'Failed to update scheduler link name' });
   }
 };

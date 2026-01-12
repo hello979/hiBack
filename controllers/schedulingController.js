@@ -9,7 +9,10 @@ const gmailService = require('../services/gmailService');
 exports.getPublicSchedule = async (req, res) => {
   try {
     const { username } = req.params;
-    const lookup = await User.findOne({ username }).select('username email preferences thoughts access');
+    // Look up by schedulerLinkName first, then fallback to username for backward compatibility
+    const lookup = await User.findOne({
+      $or: [{ schedulerLinkName: username }, { username: username }]
+    }).select('username email schedulerLinkName preferences thoughts access');
 
     if (!lookup) {
       return res.status(404).json({ success: false, message: 'Host not found' });
@@ -61,7 +64,10 @@ exports.bookSlot = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Slot start time required' });
     }
 
-    const host = await User.findOne({ username }).select('username email preferences');
+    // Look up by schedulerLinkName first, then fallback to username for backward compatibility
+    const host = await User.findOne({
+      $or: [{ schedulerLinkName: username }, { username: username }]
+    }).select('username email schedulerLinkName preferences');
     if (!host) {
       return res.status(404).json({ success: false, message: 'Host not found' });
     }

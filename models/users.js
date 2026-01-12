@@ -20,6 +20,15 @@ const UserSchema = new mongoose.Schema({
     type: String, 
     select: false 
   },
+  schedulerLinkName: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 30,
+    match: [/^[a-zA-Z0-9_-]+$/, 'Scheduler link can only contain letters, numbers, hyphens, and underscores']
+  },
   googleId: {
     type: String,
     sparse: true,

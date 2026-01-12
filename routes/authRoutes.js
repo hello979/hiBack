@@ -32,7 +32,7 @@ router.get(
         // Redirect back to frontend home on error instead of crashing
         return res.redirect(`${frontend}/?error=auth_failed`);
       }
-      
+
       // 2. If successful, manually log them in (attach to req)
       req.user = user;
       next();
@@ -53,5 +53,8 @@ router.get('/calendar/events', protect, require('../controllers/authController')
 // Debug endpoint for calendar token presence
 router.get('/calendar/debug', protect, require('../controllers/authController').getCalendarDebug);
 router.put('/preferences/scheduling', protect, updateSchedulingPreferences);
+// Scheduler link management routes
+router.get('/scheduler-link/check/:name', protect, require('../controllers/authController').checkSchedulerLinkAvailability);
+router.put('/scheduler-link', protect, require('../controllers/authController').updateSchedulerLinkName);
 
 module.exports = router;
