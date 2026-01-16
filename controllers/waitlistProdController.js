@@ -4,19 +4,25 @@ const { Waitlist } = require('../models/waitlistProd');
 exports.joinWaitlistProd = async (req, res) => {
   try {
     const { name, email, phone } = req.body;
+    console.log('[Waitlist] Join request:', { name, email, phone });
+    
     if (!name || !email || !phone) {
       return res.status(400).json({ success: false, message: 'Name, email, and phone are required.' });
     }
+    
     // Check if already exists
     const exists = await Waitlist.findOne({ email });
     if (exists) {
+      console.log('[Waitlist] Email already exists:', email);
       return res.status(409).json({ success: false, message: 'Email already on waitlist.' });
     }
-    await Waitlist.create({ name, email, phone });
+    
+    const newEntry = await Waitlist.create({ name, email, phone });
+    console.log('[Waitlist] New entry created:', newEntry._id);
     return res.json({ success: true });
   } catch (err) {
-    console.error('Waitlist join error:', err);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[Waitlist] Join error:', err.message, err.stack);
+    return res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 };
 

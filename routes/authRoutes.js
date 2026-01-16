@@ -1,6 +1,6 @@
 const express = require('express');
 const passport = require('passport');
-const { registerUser, loginUser, googleCallback, saveThoughts, saveNotificationPermission, getCurrentUser, joinWaitlist, getWaitlistStatus, updateSchedulingPreferences } = require('../controllers/authController');
+const { registerUser, loginUser, googleCallback, saveThoughts, saveNotificationPermission, getCurrentUser, updateSchedulingPreferences } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 // Local Auth
@@ -45,8 +45,6 @@ router.get(
 // Protected routes - require authentication
 router.post('/thoughts', protect, saveThoughts);
 router.post('/notification-permission', protect, saveNotificationPermission);
-router.post('/waitlist', protect, joinWaitlist);
-router.get('/waitlist/status', getWaitlistStatus); // Public endpoint
 router.get('/me', protect, getCurrentUser);
 // Protected endpoint to fetch calendar events
 router.get('/calendar/events', protect, require('../controllers/authController').getCalendarEvents);
