@@ -26,15 +26,17 @@ exports.joinWaitlistProd = async (req, res) => {
   }
 };
 
-// GET /auth/waitlist/status - Get total count + user's position
+// GET /auth/waitlist/status - Get total count + user's position (frontend compatible)
 exports.getWaitlistStatusProd = async (req, res) => {
   try {
     const { email } = req.query;
     if (!email) return res.status(400).json({ success: false, message: 'Email required' });
     const all = await Waitlist.find().sort({ joinedAt: 1 }).select('email');
-    const total = all.length;
-    const position = all.findIndex(w => w.email === email);
-    return res.json({ success: true, total, position: position === -1 ? null : position + 1 });
+    const totalCount = all.length;
+    const idx = all.findIndex(w => w.email === email);
+    const userPosition = idx === -1 ? null : idx + 1;
+    const isJoined = idx !== -1;
+    return res.json({ totalCount, userPosition, isJoined });
   } catch (err) {
     console.error('Waitlist status error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
