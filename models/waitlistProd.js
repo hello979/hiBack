@@ -2,12 +2,10 @@ const mongoose = require('mongoose');
 
 if (!process.env.PROD_MONGO_URL) {
   console.error('[Waitlist] PROD_MONGO_URL not set in environment');
+  throw new Error('PROD_MONGO_URL is required for waitlist functionality');
 }
 
-const waitlistConn = mongoose.createConnection(process.env.PROD_MONGO_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const waitlistConn = mongoose.createConnection(process.env.PROD_MONGO_URL);
 
 waitlistConn.on('connected', () => {
   console.log('[Waitlist] Connected to PROD MongoDB cluster');
