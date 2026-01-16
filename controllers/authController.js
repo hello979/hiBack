@@ -1,3 +1,15 @@
+// Mark welcome modal as seen
+exports.setWelcomeSeen = async (req, res) => {
+  try {
+    const userId = req.user && req.user._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    await User.findByIdAndUpdate(userId, { hasSeenWelcome: true });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Error in setWelcomeSeen:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 const User = require('../models/users');
 const Waitlist = require('../models/Waitlist');
 const bcrypt = require('bcryptjs');

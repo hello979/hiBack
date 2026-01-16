@@ -62,6 +62,13 @@ const UserSchema = new mongoose.Schema({
   },
 
   // ============================================================
+  // Welcome Modal Tracking
+  // ============================================================
+  hasSeenWelcome: {
+    type: Boolean,
+    default: false
+  },
+  // ============================================================
   // NEW: AGENTIC PREFERENCES (Adaptive Learning)
   // This is where the bot stores what it learns about your style
   // ============================================================

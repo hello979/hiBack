@@ -53,6 +53,9 @@ router.get('/calendar/events', protect, require('../controllers/authController')
 // Debug endpoint for calendar token presence
 router.get('/calendar/debug', protect, require('../controllers/authController').getCalendarDebug);
 router.put('/preferences/scheduling', protect, updateSchedulingPreferences);
+
+// Mark welcome modal as seen
+router.post('/welcome-seen', protect, require('../controllers/authController').setWelcomeSeen);
 // Scheduler link management routes
 router.get('/scheduler-link/check/:name', protect, require('../controllers/authController').checkSchedulerLinkAvailability);
 router.put('/scheduler-link', protect, require('../controllers/authController').updateSchedulerLinkName);
