@@ -54,8 +54,16 @@ router.get('/calendar/events', protect, require('../controllers/authController')
 router.get('/calendar/debug', protect, require('../controllers/authController').getCalendarDebug);
 router.put('/preferences/scheduling', protect, updateSchedulingPreferences);
 
+
 // Mark welcome modal as seen
 router.post('/welcome-seen', protect, require('../controllers/authController').setWelcomeSeen);
+
+// --- New Waitlist (PROD_MONGO_URL) endpoints ---
+const waitlistProd = require('../controllers/waitlistProdController');
+router.post('/waitlist', waitlistProd.joinWaitlistProd);
+router.get('/waitlist/status', waitlistProd.getWaitlistStatusProd);
+router.get('/waitlist/check/:email', waitlistProd.checkWaitlistEmailProd);
+
 // Scheduler link management routes
 router.get('/scheduler-link/check/:name', protect, require('../controllers/authController').checkSchedulerLinkAvailability);
 router.put('/scheduler-link', protect, require('../controllers/authController').updateSchedulerLinkName);
