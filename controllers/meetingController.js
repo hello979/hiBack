@@ -166,6 +166,11 @@ exports.assignBot = async (req, res) => {
 
             if (end > now && end > joinTime) {
                 try {
+                    // Determine enable_speak from bot_config
+                    const enableSpeak = bot_config.enable_speak === true;
+                    // Force enable_transcript when enable_speak is true
+                    const enableTranscript = enableSpeak ? true : (bot_config.enable_transcript !== false);
+                    
                     const schedulePayload = {
                         bot_id: bot.bot_service_bot_id,
                         meetlink: meetlink,
@@ -175,8 +180,8 @@ exports.assignBot = async (req, res) => {
                         min_record_time_seconds: durationSeconds,
                         config: {
                             enable_recording: bot_config.enable_recording !== false,
-                            enable_transcript: bot_config.enable_transcript !== false,
-                            enable_speak: false
+                            enable_transcript: enableTranscript,
+                            enable_speak: enableSpeak
                         }
                     };
 
@@ -228,7 +233,7 @@ exports.assignBot = async (req, res) => {
       bot_config: {
         enable_recording: bot_config.enable_recording !== false,
         enable_transcript: bot_config.enable_transcript !== false,
-        enable_speak: false,
+        enable_speak: bot_config.enable_speak === true,
         auto_join: !!auto_join,
         // SAVE duration to DB so 'start' (manual trigger) can use it later
         min_record_time_seconds: durationSeconds 
@@ -313,6 +318,12 @@ exports.engage = async (req, res) => {
 
                  if (end > joinTime) {
                      try {
+                         // Determine enable_speak from bot_config
+                         const enableSpeak = meeting.bot_config?.enable_speak === true;
+                         // Force enable_transcript when enable_speak is true
+                         const configToUse = meeting.bot_config || { enable_recording: true, enable_transcript: true };
+                         const enableTranscript = enableSpeak ? true : (configToUse.enable_transcript !== false);
+                         
                          const schedulePayload = {
                              bot_id: bot.bot_service_bot_id,
                              meetlink: meeting.meetlink,
@@ -320,7 +331,11 @@ exports.engage = async (req, res) => {
                              end_time: end.toISOString(),
                              // Retrieve saved duration from DB
                              min_record_time_seconds: meeting.bot_config?.min_record_time_seconds || 60,
-                             config: meeting.bot_config || { enable_recording: true, enable_transcript: true }
+                             config: {
+                                 enable_recording: configToUse.enable_recording !== false,
+                                 enable_transcript: enableTranscript,
+                                 enable_speak: enableSpeak
+                             }
                          };
                          
                          const scheduleResp = await hicapy.createSchedule({ apiKey, payload: schedulePayload });
@@ -419,6 +434,11 @@ exports.start = async (req, res) => {
 
     // Retrieve saved duration from DB (saved during assignBot)
     const duration = meeting.bot_config?.min_record_time_seconds || 60;
+    
+    // Determine enable_speak from bot_config
+    const enableSpeak = meeting.bot_config?.enable_speak === true;
+    // Force enable_transcript when enable_speak is true
+    const enableTranscript = enableSpeak ? true : (meeting.bot_config?.enable_transcript !== false);
 
     const payload = {
       meetlink: meeting.meetlink,
@@ -426,8 +446,8 @@ exports.start = async (req, res) => {
       meeting_id: meeting.meeting_id,
       min_record_time: duration, // Map to Start API parameter
       enable_recording: meeting.bot_config?.enable_recording !== false,
-      enable_transcript: meeting.bot_config?.enable_transcript !== false,
-      enable_speak: false
+      enable_transcript: enableTranscript,
+      enable_speak: enableSpeak
     };
 
     console.log(`[Manual Start] Starting bot with duration: ${duration}s`);
