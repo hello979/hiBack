@@ -519,7 +519,12 @@ exports.instant = async (req, res) => {
     // 1. Force Integer Conversion & Default to 600s (10 min) if missing to avoid 60s issues
     const calculatedDuration = parseInt(min_record_time_seconds, 10) || 600; 
     
-    console.log(`[Instant Start] Request received for: ${meetlink} duration: ${calculatedDuration}`);
+    // 2. Determine enable_speak from bot_config (CRITICAL: was hardcoded to false before)
+    const enableSpeak = bot_config.enable_speak === true;
+    // Force enable_transcript when enable_speak is true (voice bot needs transcript)
+    const enableTranscript = enableSpeak ? true : (bot_config.enable_transcript !== false);
+    
+    console.log(`[Instant Start] Request received for: ${meetlink} duration: ${calculatedDuration}s, enable_speak: ${enableSpeak}`);
 
     if (!meetlink || !bot_id) return res.status(400).json({ success: false, message: 'meetlink and bot_id required' });
 
@@ -552,8 +557,8 @@ exports.instant = async (req, res) => {
       engaged_at: new Date(),
       bot_config: {
         enable_recording: bot_config.enable_recording !== false,
-        enable_transcript: bot_config.enable_transcript !== false,
-        enable_speak: false,
+        enable_transcript: enableTranscript,
+        enable_speak: enableSpeak,
         // Save duration to DB
         min_record_time_seconds: calculatedDuration
       },
@@ -569,7 +574,7 @@ exports.instant = async (req, res) => {
       min_record_time: calculatedDuration, 
       enable_recording: meeting.bot_config.enable_recording,
       enable_transcript: meeting.bot_config.enable_transcript,
-      enable_speak: false
+      enable_speak: meeting.bot_config.enable_speak
     };
 
     const startResp = await hicapy.startBot({ apiKey, botId: bot.bot_service_bot_id, payload, correlationId });
